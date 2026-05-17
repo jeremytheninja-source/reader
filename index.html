@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Reader">
+<meta name="theme-color" content="#b8b8b8">
+<title>Reader</title>
+<style>
+  :root {
+    --bg: #b8b8b8;
+    --card: #ffffff;
+    --text: #000000;
+    --muted: #555555;
+    --accent: #111111;
+    --accent-fg: #e0e0e0;
+    --divider: #999999;
+    --font: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; background: var(--bg); font-family: var(--font); color: var(--text); overscroll-behavior: none; }
+
+  .screen { display: none; min-height: 100vh; flex-direction: column; }
+  .screen.active { display: flex; }
+
+  #home { align-items: center; justify-content: center; padding: 2rem 1.5rem; gap: 1.25rem; }
+
+  .wordmark { display: flex; align-items: center; gap: 10px; }
+  .wm-icon {
+    width: 44px; height: 44px; background: var(--accent);
+    border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .wm-text { font-size: 36px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--accent); }
+
+  #url-input {
+    width: 100%; max-width: 480px; background: var(--card);
+    border: none; border-radius: 14px; padding: 1rem 1.1rem;
+    font-family: var(--font); font-size: 16px; color: var(--text); outline: none;
+  }
+  #read-btn {
+    width: 100%; max-width: 480px; background: var(--accent); color: var(--accent-fg);
+    font-family: var(--font); font-size: 26px; font-weight: 700; letter-spacing: 3px;
+    padding: 1.1rem; border: none; border-radius: 14px; cursor: pointer;
+    transition: transform 0.1s;
+  }
+  #read-btn:active { transform: scale(0.97); }
+  #read-btn:disabled { background: #888; letter-spacing: 1px; font-size: 18px; cursor: default; transform: none; }
+  #home-status { font-size: 14px; color: var(--muted); min-height: 1.2rem; text-align: center; max-width: 480px; }
+
+  .recent-label {
+    font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+    color: #666; align-self: flex-start; width: 100%; max-width: 480px;
+  }
+  #recent-list { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 7px; }
+  .recent-item {
+    background: var(--card); border-radius: 10px; padding: 0.75rem 1rem;
+    font-size: 14px; font-weight: 500; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer;
+  }
+
+  #reader { background: var(--bg); }
+  #reader-toolbar {
+    display: flex; align-items: center; padding: 10px 14px 9px;
+    border-bottom: 1.5px solid var(--divider); background: var(--bg);
+    gap: 8px; flex-shrink: 0;
+  }
+  .back-pill {
+    background: var(--card); border: none; border-radius: 20px;
+    padding: 6px 14px; font-family: var(--font); font-size: 14px;
+    font-weight: 700; color: var(--text); cursor: pointer; white-space: nowrap;
+  }
+  #reader-source {
+    flex: 1; font-size: 11px; color: var(--muted); letter-spacing: 0.5px;
+    text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .sz-btn {
+    background: var(--card); border: none; border-radius: 20px;
+    padding: 5px 11px; font-family: var(--font); color: var(--text); cursor: pointer; flex-shrink: 0;
+  }
+
+  #article-area {
+    flex: 1; padding: 1.35rem 1.5rem 0.75rem;
+    overflow: hidden; display: flex; flex-direction: column; gap: 0.75rem;
+  }
+  #article-title { font-weight: 700; line-height: 1.25; color: var(--text); }
+  .art-divider { width: 32px; height: 2px; background: var(--divider); border-radius: 2px; flex-shrink: 0; }
+  #article-body {
+    font-weight: 500; line-height: 1.9; color: var(--text);
+    text-align: justify; hyphens: auto; flex: 1; letter-spacing: 0.01em; overflow: hidden;
+  }
+  #article-body p { margin-bottom: 0.85em; }
+  #article-body h2, #article-body h3 { font-weight: 700; margin: 1.2em 0 0.4em; line-height: 1.3; }
+  #article-body a {
+    color: var(--text); text-decoration: underline;
+    text-decoration-color: var(--divider); text-underline-offset: 3px;
+  }
+  #article-body ul, #article-body ol { margin: 0 0 0.85em 1.5em; }
+  #article-body li { margin-bottom: 0.3em; }
+  #article-body blockquote {
+    border-left: 3px solid var(--divider); margin: 0 0 0.85em;
+    padding-left: 1rem; color: var(--muted);
+  }
+
+  .page-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px 14px; border-top: 1.5px solid var(--divider);
+    background: var(--bg); flex-shrink: 0;
+  }
+  .page-btn {
+    background: var(--accent); color: var(--accent-fg); border: none;
+    border-radius: 14px; font-family: var(--font); font-size: 28px; font-weight: 700;
+    width: 64px; height: 52px; cursor: pointer; display: flex;
+    align-items: center; justify-content: center; flex-shrink: 0; transition: transform 0.1s;
+  }
+  .page-btn:active { transform: scale(0.95); }
+  .page-btn:disabled { background: var(--divider); color: #bbb; cursor: default; transform: none; }
+  #page-counter { font-size: 13px; color: var(--muted); font-weight: 600; letter-spacing: 0.5px; }
+
+  .spinner {
+    width: 32px; height: 32px; border: 3px solid #ccc;
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin 0.7s linear infinite; margin: 3rem auto;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .error-box {
+    background: var(--card); border-radius: 14px; padding: 1.5rem;
+    text-align: center; font-size: 16px; font-weight: 500;
+    color: #700; line-height: 1.7; margin: 1rem 0;
+  }
+  .error-box a { color: #111; font-weight: 700; }
+</style>
+</head>
+<body>
+
+<!-- HOME -->
+<div id="home" class="screen active">
+  <div class="wordmark">
+    <div class="wm-icon">
+      <svg width="26" height="26" viewBox="0 0 22 22" fill="none">
+        <path d="M3 5.5C3 4.67 3.67 4 4.5 4H9.5C10.33 4 11 4.67 11 5.5V16.5C11 17.33 10.33 18 9.5 18H4.5C3.67 18 3 17.33 3 16.5V5.5Z" fill="#e0e0e0"/>
+        <path d="M11 5.5C11 4.67 11.67 4 12.5 4H17.5C18.33 4 19 4.67 19 5.5V16.5C19 17.33 18.33 18 17.5 18H12.5C11.67 18 11 17.33 11 16.5V5.5Z" fill="#e0e0e0"/>
+        <line x1="11" y1="4" x2="11" y2="18" stroke="#b8b8b8" stroke-width="1.5"/>
+        <line x1="5" y1="7" x2="9" y2="7" stroke="#b8b8b8" stroke-width="1" stroke-linecap="round"/>
+        <line x1="5" y1="9.5" x2="9" y2="9.5" stroke="#b8b8b8" stroke-width="1" stroke-linecap="round"/>
+        <line x1="5" y1="12" x2="8" y2="12" stroke="#b8b8b8" stroke-width="1" stroke-linecap="round"/>
+        <line x1="13" y1="7" x2="17" y2="7" stroke="#b8b8b8" stroke-width="1" stroke-linecap="round"/>
+        <line x1="13" y1="9.5" x2="17" y2="9.5" stroke="#b8b8b8" stroke-width="1" stroke-linecap="round"/>
+        <line x1="13" y1="12" x2="16" y2="12" stroke="#b8b8b8" stroke-width="1" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div class="wm-text">Reader</div>
+  </div>
+
+  <input id="url-input" type="url" inputmode="url" placeholder="Paste a link here…"
+    autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+  <button id="read-btn">READ</button>
+  <div id="home-status"></div>
+
+  <div id="recent-section" style="width:100%;max-width:480px;display:none;flex-direction:column;gap:8px;">
+    <div class="recent-label">Recent</div>
+    <div id="recent-list"></div>
+  </div>
+</div>
+
+<!-- READER -->
+<div id="reader" class="screen">
+  <div id="reader-toolbar">
+    <button class="back-pill" id="back-btn">← Back</button>
+    <span id="reader-source"></span>
+    <button class="sz-btn" style="font-size:13px" id="sz-down">A</button>
+    <button class="sz-btn" style="font-size:18px;font-weight:700" id="sz-up">A</button>
+  </div>
+  <div id="article-area">
+    <div id="article-title"></div>
+    <div class="art-divider"></div>
+    <div id="article-body"></div>
+  </div>
+  <div class="page-bar">
+    <button class="page-btn" id="prev-btn">‹</button>
+    <span id="page-counter"></span>
+    <button class="page-btn" id="next-btn">›</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mozilla/readability@0.5.0/Readability.min.js"></script>
+<script>
+// ── PWA MANIFEST ──
+const iconSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='512' height='512' viewBox='0 0 512 512'><rect width='512' height='512' rx='80' fill='%23111111'/><g transform='translate(96,112)'><path d='M16 32C16 18 27 8 41 8H160C174 8 184 18 184 32V272C184 286 174 296 160 296H41C27 296 16 286 16 272V32Z' fill='%23e0e0e0'/><path d='M184 32C184 18 195 8 209 8H328C342 8 352 18 352 32V272C352 286 342 296 328 296H209C195 296 184 286 184 272V32Z' fill='%23e0e0e0'/><line x1='184' y1='8' x2='184' y2='296' stroke='%23b8b8b8' stroke-width='12'/><line x1='48' y1='72' x2='152' y2='72' stroke='%23b8b8b8' stroke-width='10' stroke-linecap='round'/><line x1='48' y1='112' x2='152' y2='112' stroke='%23b8b8b8' stroke-width='10' stroke-linecap='round'/><line x1='48' y1='152' x2='136' y2='152' stroke='%23b8b8b8' stroke-width='10' stroke-linecap='round'/><line x1='216' y1='72' x2='320' y2='72' stroke='%23b8b8b8' stroke-width='10' stroke-linecap='round'/><line x1='216' y1='112' x2='320' y2='112' stroke='%23b8b8b8' stroke-width='10' stroke-linecap='round'/><line x1='216' y1='152' x2='304' y2='152' stroke='%23b8b8b8' stroke-width='10' stroke-linecap='round'/></g></svg>`;
+const manifest = {
+  name: "Reader", short_name: "Reader", start_url: "./", display: "standalone",
+  background_color: "#b8b8b8", theme_color: "#b8b8b8",
+  icons: [{ src: `data:image/svg+xml,${iconSvg}`, sizes: "512x512", type: "image/svg+xml", purpose: "any maskable" }]
+};
+const mBlob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+const mLink = document.createElement('link');
+mLink.rel = 'manifest'; mLink.href = URL.createObjectURL(mBlob);
+document.head.appendChild(mLink);
+const appleIcon = document.createElement('link');
+appleIcon.rel = 'apple-touch-icon';
+appleIcon.href = `data:image/svg+xml,${iconSvg}`;
+document.head.appendChild(appleIcon);
+
+// ── STATE ──
+let fontSize = parseInt(localStorage.getItem('reader-fontsize') || '18');
+let recent = JSON.parse(localStorage.getItem('reader-recent') || '[]');
+let pages = [], currentPage = 0, navStack = [];
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ── RECENT ──
+function saveRecent(url, title) {
+  recent = recent.filter(r => r.url !== url);
+  recent.unshift({ url, title: title || url });
+  if (recent.length > 6) recent = recent.slice(0, 6);
+  localStorage.setItem('reader-recent', JSON.stringify(recent));
+  renderRecent();
+}
+function renderRecent() {
+  const list = document.getElementById('recent-list');
+  const section = document.getElementById('recent-section');
+  if (!recent.length) { section.style.display = 'none'; return; }
+  section.style.display = 'flex';
+  list.innerHTML = '';
+  recent.forEach(r => {
+    const el = document.createElement('div');
+    el.className = 'recent-item';
+    el.textContent = r.title.length > 60 ? r.title.slice(0, 60) + '…' : r.title;
+    el.addEventListener('click', () => {
+      document.getElementById('url-input').value = r.url;
+      navStack = [];
+      fetchArticle(r.url);
+    });
+    list.appendChild(el);
+  });
+}
+renderRecent();
+
+// ── FETCH ──
+async function fetchArticle(url, pushToStack) {
+  if (!url || !url.startsWith('http')) {
+    document.getElementById('home-status').textContent = 'Please paste a full link starting with https://';
+    return;
+  }
+  const btn = document.getElementById('read-btn');
+  btn.disabled = true; btn.textContent = 'Fetching…';
+  document.getElementById('home-status').textContent = '';
+  showScreen('reader');
+  document.getElementById('article-title').textContent = '';
+  document.getElementById('article-body').innerHTML = '<div class="spinner"></div>';
+  document.getElementById('reader-source').textContent = '';
+  document.getElementById('page-counter').textContent = '';
+  document.getElementById('prev-btn').disabled = true;
+  document.getElementById('next-btn').disabled = true;
+
+  // Try 12ft paywall bypass first, then direct
+  const attempts = [
+    `https://api.allorigins.win/get?url=${encodeURIComponent('https://12ft.io/proxy?q=' + encodeURIComponent(url))}`,
+    `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`
+  ];
+
+  let html = null;
+  for (const attempt of attempts) {
+    try {
+      const res = await fetch(attempt, { signal: AbortSignal.timeout(10000) });
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (data.contents && data.contents.length > 500) { html = data.contents; break; }
+    } catch { continue; }
+  }
+
+  btn.disabled = false; btn.textContent = 'READ';
+
+  if (!html) {
+    document.getElementById('article-body').innerHTML =
+      `<div class="error-box">Couldn't fetch that page. The site may block outside access.<br><br><a href="${url}" target="_blank">Open in browser instead →</a></div>`;
+    return;
+  }
+
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const base = doc.createElement('base'); base.href = url;
+    doc.head.appendChild(base);
+
+    const article = new Readability(doc, { charThreshold: 100 }).parse();
+    if (!article || article.textContent.trim().length < 100) throw new Error('Not enough article content found.');
+
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = article.content;
+
+    // Absolutize links
+    tempDiv.querySelectorAll('a[href]').forEach(a => {
+      try { a.href = new URL(a.getAttribute('href'), url).href; } catch { a.removeAttribute('href'); }
+    });
+
+    // Strip non-text elements
+    tempDiv.querySelectorAll('img,figure,figcaption,picture,video,audio,script,style,iframe,button,input,form,table').forEach(el => el.remove());
+
+    const blocks = Array.from(tempDiv.querySelectorAll('p,h2,h3,blockquote,ul,ol'))
+      .filter(el => el.textContent.trim().length > 20)
+      .map(el => el.outerHTML);
+
+    if (!blocks.length) throw new Error('No readable paragraphs found.');
+
+    pages = [];
+    for (let i = 0; i < blocks.length; i += 3) pages.push(blocks.slice(i, i + 3).join(''));
+    currentPage = 0;
+
+    let hostname = '';
+    try { hostname = new URL(url).hostname.replace('www.', ''); } catch {}
+
+    if (pushToStack !== false) saveRecent(url, article.title || url);
+    renderReader(article.title || '', article.byline || hostname);
+
+  } catch (err) {
+    document.getElementById('article-body').innerHTML =
+      `<div class="error-box">Couldn't read that article.<br><br>${err.message}<br><br><a href="${url}" target="_blank">Open in browser instead →</a></div>`;
+    document.getElementById('article-title').textContent = '';
+  }
+}
+
+// ── RENDER ──
+function renderReader(title, source) {
+  applyFontSize();
+  document.getElementById('article-title').textContent = title;
+  document.getElementById('reader-source').textContent = source;
+  renderPage();
+}
+function renderPage() {
+  document.getElementById('article-body').innerHTML = pages[currentPage] || '';
+  document.getElementById('page-counter').textContent = `${currentPage + 1} of ${pages.length}`;
+  document.getElementById('prev-btn').disabled = currentPage === 0;
+  document.getElementById('next-btn').disabled = currentPage === pages.length - 1;
+  interceptLinks();
+}
+
+// ── LINK INTERCEPTION ──
+function interceptLinks() {
+  document.querySelectorAll('#article-body a[href]').forEach(a => {
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      if (!a.href || !a.href.startsWith('http')) return;
+      navStack.push({
+        title: document.getElementById('article-title').textContent,
+        source: document.getElementById('reader-source').textContent,
+        pages: [...pages], page: currentPage,
+        url: document.getElementById('url-input').value
+      });
+      document.getElementById('url-input').value = a.href;
+      fetchArticle(a.href, false);
+    });
+  });
+}
+
+// ── BACK ──
+document.getElementById('back-btn').addEventListener('click', () => {
+  if (navStack.length > 0) {
+    const prev = navStack.pop();
+    pages = prev.pages; currentPage = prev.page;
+    document.getElementById('url-input').value = prev.url;
+    renderReader(prev.title, prev.source);
+  } else {
+    showScreen('home'); renderRecent();
+  }
+});
+
+// ── PAGE TURN ──
+document.getElementById('next-btn').addEventListener('click', () => { if (currentPage < pages.length-1) { currentPage++; renderPage(); } });
+document.getElementById('prev-btn').addEventListener('click', () => { if (currentPage > 0) { currentPage--; renderPage(); } });
+
+// Swipe
+let tx = 0;
+document.getElementById('reader').addEventListener('touchstart', e => { tx = e.touches[0].clientX; }, { passive: true });
+document.getElementById('reader').addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - tx;
+  if (Math.abs(dx) > 60) {
+    if (dx < 0 && currentPage < pages.length-1) { currentPage++; renderPage(); }
+    if (dx > 0 && currentPage > 0) { currentPage--; renderPage(); }
+  }
+});
+
+// ── FONT SIZE ──
+function applyFontSize() {
+  document.getElementById('article-body').style.fontSize = fontSize + 'px';
+  document.getElementById('article-title').style.fontSize = Math.round(fontSize * 1.1) + 'px';
+}
+document.getElementById('sz-up').addEventListener('click', () => { fontSize = Math.min(fontSize+2, 32); localStorage.setItem('reader-fontsize', fontSize); applyFontSize(); });
+document.getElementById('sz-down').addEventListener('click', () => { fontSize = Math.max(fontSize-2, 14); localStorage.setItem('reader-fontsize', fontSize); applyFontSize(); });
+
+// ── READ ──
+document.getElementById('read-btn').addEventListener('click', () => { navStack = []; fetchArticle(document.getElementById('url-input').value.trim()); });
+document.getElementById('url-input').addEventListener('keydown', e => { if (e.key === 'Enter') { navStack = []; fetchArticle(document.getElementById('url-input').value.trim()); } });
+</script>
+</body>
+</html>
